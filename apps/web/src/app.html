@@ -82,7 +82,7 @@
         ></script>
         %sveltekit.head%
     </head>
-    <body data-sveltekit-preload-data="hover">
+    <body>
         <div style="display: contents">%sveltekit.body%</div>
         <!-- Safari bfcache 복원 시 stale 상태 방지 -->
         <script>
@@ -109,6 +109,32 @@
                 var KEY = '__angple_chunk_error__';
                 var MAX_RELOADS = 2;
                 var WINDOW_MS = 60000;
+
+                function clearClientCaches() {
+                    try {
+                        if (navigator.serviceWorker) {
+                            navigator.serviceWorker.getRegistrations().then(function (regs) {
+                                regs.forEach(function (r) {
+                                    r.unregister();
+                                });
+                            });
+                        }
+                        if (window.caches) {
+                            caches.keys().then(function (names) {
+                                names.forEach(function (name) {
+                                    caches.delete(name);
+                                });
+                            });
+                        }
+                    } catch (e) {}
+                }
+
+                function reloadFresh() {
+                    clearClientCaches();
+                    var url = new URL(location.href);
+                    url.searchParams.set('_v', String(Date.now()));
+                    location.replace(url.toString());
+                }
 
                 function getState() {
                     try {
@@ -147,7 +173,7 @@
                     s.ts = now;
                     if (s.count <= MAX_RELOADS) {
                         setState(s);
-                        location.reload();
+                        reloadFresh();
                     } else {
                         s.exhausted = true;
                         setState(s);
@@ -159,7 +185,11 @@
                 }
 
                 // 전역 노출 (hooks.client.ts와 공유)
-                window.__angpleChunkError = { getState: getState, handle: handle };
+                window.__angpleChunkError = {
+                    getState: getState,
+                    handle: handle,
+                    reloadFresh: reloadFresh
+                };
 
                 // <script>/<link> error 이벤트 캡처
                 window.addEventListener(
@@ -230,7 +260,7 @@
                                 '<h1 style="font-size:20px;font-weight:600;margin-bottom:12px">페이지를 불러올 수 없습니다</h1>' +
                                 '<p style="font-size:14px;color:#6b7280;margin-bottom:24px;line-height:1.6">새 버전이 배포되어 페이지를 표시할 수 없습니다.<br>아래 버튼을 눌러 새로고침해 주세요.</p>' +
                                 '<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">' +
-                                '<button onclick="location.reload()" style="padding:10px 20px;font-size:14px;font-weight:500;border-radius:8px;border:none;background:' +
+                                '<button onclick="window.__angpleChunkError && window.__angpleChunkError.reloadFresh ? window.__angpleChunkError.reloadFresh() : location.reload()" style="padding:10px 20px;font-size:14px;font-weight:500;border-radius:8px;border:none;background:' +
                                 btnBg +
                                 ';color:#fff;cursor:pointer">새로고침</button>' +
                                 "<button onclick=\"if(navigator.serviceWorker){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(s){s.unregister()})})};if(window.caches){caches.keys().then(function(n){n.forEach(function(k){caches.delete(k)})})};setTimeout(function(){location.replace(location.href.split('?')[0]+'?_v='+Date.now())},300)\" style=\"padding:10px 20px;font-size:14px;font-weight:500;border-radius:8px;border:1px solid " +
